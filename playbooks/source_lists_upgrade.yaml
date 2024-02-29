@@ -1,0 +1,8 @@
+---
+- name: Upgrade Kubernetes package source list
+  hosts: all
+  become: yes
+  vars:
+    ansible_ssh_common_args: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+  roles:
+    - upgrade-source-lists

@@ -1,0 +1,5 @@
+kubeadm_version: "1.29.1-1.1"
+kubelet_version: "1.29.1-1.1"
+kubectl_version: "1.29.1-1.1"
+
+target_kubernetes_version: "1.29.1"

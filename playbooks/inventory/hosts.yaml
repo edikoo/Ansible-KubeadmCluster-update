@@ -1,0 +1,32 @@
+all:
+  hosts:
+  children:
+    masters:
+      hosts:
+        master-1:
+          ansible_host: [IP ADDRESS]
+          ansible_user: root
+          ansible_ssh_pass: password
+          hostname: master-1
+        master-2:
+          ansible_host: [IP ADDRESS]
+          ansible_user: root
+          ansible_ssh_pass: password
+          hostname: master-2
+        master-3:
+          ansible_host: [IP ADDRESS]
+          ansible_user: root
+          ansible_ssh_pass: password
+          hostname: master-3
+    workers:
+      hosts:
+        worker-1:
+          ansible_host: [IP ADDRESS]
+          ansible_user: root
+          ansible_ssh_pass: password
+          hostname: worker-1
+        worker-2:
+          ansible_host: [IP ADDRESS]
+          ansible_user: root
+          ansible_ssh_pass: password
+          hostname: worker-2

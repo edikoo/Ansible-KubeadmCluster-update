@@ -1,0 +1,91 @@
+---
+- name: Check if upgrade flag file exists. 
+  stat:
+    path: /tmp/kubernetes-upgrade-worker-{{ target_kubernetes_version }}-completed
+  register: upgrade_flag
+
+- name: Strat kubernetes upgrade if file not exsits
+  when: not upgrade_flag.stat.exists
+  block:
+
+    - name: Drain worker node for maintenance
+      command: kubectl drain {{ hostname }} --force --ignore-daemonsets --delete-emptydir-data
+      delegate_to: "{{ groups['masters'][0] }}"
+
+    - name: Unhold kubeadm to allow upgrade
+      dpkg_selections:
+        name: kubeadm
+        selection: install
+
+    - name: Update the apt package index
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600  # 3600 seconds = 1 hours
+
+    - name: Upgrade kubeadm to {{ kubeadm_version }} on master nodes
+      apt:
+        name: kubeadm={{ kubeadm_version }}
+        state: present
+
+    - name: Hold kubeadm to prevent automatic upgrades in the future
+      dpkg_selections:
+        name: kubeadm
+        selection: hold
+
+    - name: Upgrade worker node using kubeadm
+      command: kubeadm upgrade node
+
+    - name:  Unhold kubelet and kubectl to allow upgrade
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: install
+      loop:
+        - kubelet
+        - kubectl
+
+    - name: Upgrade kubelet and kubectl on master nodes
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - kubelet={{ kubelet_version }}
+        - kubectl={{ kubectl_version }}
+
+    # Hold Kubernetes packages
+    - name: Hold Kubernetes packages
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubectl
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart kubelet
+      ansible.builtin.service:
+        name: kubelet
+        state: restarted
+
+    - name: Uncordon master node
+      command: kubectl uncordon {{ hostname }}
+      delegate_to: "{{ groups['masters'][0] }}"
+
+    - name: Create upgrade flag file #it creates file if succesfully upgraded node in order to not run again same version
+      file:
+        path: /tmp/kubernetes-upgrade-worker-{{ target_kubernetes_version }}-completed
+        state: touch
+
+     # If all tasks are successful, the playbook creates a flag file indicating that the node has been successfully upgraded to the specified version.
+     # In future playbook runs, before initiating the upgrade process, the playbook checks for the presence of this flag file. If the file exists for the target version, the playbook infers that the upgrade has already been done and can skip the upgrade tasks, thus maintaining idempotency.
+
+    - name: Pause for a manual check
+      pause:
+        prompt: "The upgrade of {{ hostname }} is complete. Check everything is OK and press enter to continue with the next node..."
+  
+  rescue:
+    - name: An error occurred while upgrading workers, stopping the playbook
+      fail:
+        msg: "An error occurred during the upgrade process. The playbook has been stopped."
